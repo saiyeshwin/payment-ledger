@@ -1,0 +1,1593 @@
+If you're giving this to Claude/Cursor and want it to **actually build the project**, don't ask for "a microservices expense app" vaguely. Give it a constrained architecture, clear services, event flows, failure handling, testing requirements, and implementation order.
+
+Here’s a prompt you can use directly:
+
+# Build Prompt: Expense Management & Payment Ledger Platform
+
+You are a senior Java backend engineer and mentor.
+
+I want to build a **production-style Expense Management & Payment Ledger backend** as a portfolio project. The project should demonstrate that I understand:
+
+* Java + Spring Boot
+* Spring Security + JWT
+* REST API design
+* Microservices architecture
+* PostgreSQL
+* JPA/Hibernate
+* Apache Kafka
+* Event-driven architecture
+* Idempotency
+* Retry mechanisms
+* Dead Letter Queues
+* Distributed systems concepts
+* JUnit + Mockito
+* Integration testing
+* Docker / Docker Compose
+
+Do **not** over-engineer this into an enterprise monster. Keep the business domain simple, but make the architecture technically interesting and realistic.
+
+---
+
+# 1. Project Goal
+
+Build an **Expense Management & Payment Ledger API** where authenticated users can:
+
+* Register/login
+* Create expenses
+* Update expenses
+* Delete expenses
+* View their expenses
+* Filter expenses
+* Paginate expenses
+* Categorize expenses
+* Track payment status
+* View financial summaries
+* Maintain a reliable payment/transaction ledger
+
+The system should use **microservices + Kafka events** so that important operations are processed asynchronously.
+
+---
+
+# 2. Technology Stack
+
+Use:
+
+### Backend
+
+* Java 21
+* Spring Boot 3.x
+* Spring Security
+* JWT
+* Spring Data JPA
+* Hibernate
+* Bean Validation
+* REST APIs
+
+### Database
+
+* PostgreSQL
+
+### Messaging
+
+* Apache Kafka
+* Kafka topics
+* Kafka producers
+* Kafka consumers
+* Consumer groups
+
+### Testing
+
+* JUnit 5
+* Mockito
+* Spring Boot Test
+* MockMvc
+* Testcontainers where appropriate
+
+### DevOps
+
+* Docker
+* Docker Compose
+
+### Build
+
+* Maven
+
+Do NOT use Lombok.
+
+Use clean Java code with constructors, getters/setters where appropriate, and explicit dependency injection.
+
+---
+
+# 3. Microservices Architecture
+
+Create the following services:
+
+```text
+                    ┌─────────────────────┐
+                    │       Client        │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │     API Gateway     │
+                    └──────────┬──────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │                  │                  │
+            ▼                  ▼                  ▼
+   ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+   │ Auth Service   │ │ Expense Service│ │ Ledger Service │
+   └────────────────┘ └───────┬────────┘ └───────┬────────┘
+                               │                  │
+                               └────────┬─────────┘
+                                        ▼
+                               ┌────────────────┐
+                               │     Kafka      │
+                               └───────┬────────┘
+                                       │
+                         ┌─────────────┼─────────────┐
+                         ▼             ▼             ▼
+                  Notification   Reporting      Payment
+                     Service       Service        Service
+```
+
+However, keep the implementation manageable.
+
+### Required services
+
+## 3.1 API Gateway
+
+Responsibilities:
+
+* Single entry point for clients
+* Route requests to services
+* Forward authentication information
+* Basic request logging
+* Handle common errors where appropriate
+
+Use Spring Cloud Gateway if compatible with the selected Spring Boot version.
+
+---
+
+## 3.2 Auth Service
+
+Responsibilities:
+
+* User registration
+* User login
+* Password hashing
+* JWT generation
+* JWT validation
+* User information
+
+Endpoints:
+
+```http
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/me
+```
+
+User fields:
+
+```text
+id
+name
+email
+passwordHash
+createdAt
+updatedAt
+```
+
+Use BCrypt for password hashing.
+
+JWT should contain:
+
+```text
+userId
+email
+roles
+```
+
+Do not store plaintext passwords.
+
+---
+
+# 4. Expense Service
+
+This is the main business service.
+
+Responsibilities:
+
+* Create expense
+* Update expense
+* Delete expense
+* Retrieve expenses
+* Filtering
+* Pagination
+* Expense categorization
+
+Expense:
+
+```text
+id
+userId
+amount
+currency
+category
+description
+paymentMethod
+status
+createdAt
+updatedAt
+```
+
+Example categories:
+
+```text
+FOOD
+TRANSPORT
+SHOPPING
+ENTERTAINMENT
+BILLS
+HEALTH
+EDUCATION
+OTHER
+```
+
+Payment methods:
+
+```text
+UPI
+CARD
+CASH
+BANK_TRANSFER
+OTHER
+```
+
+Expense status:
+
+```text
+PENDING
+COMPLETED
+FAILED
+```
+
+---
+
+# 5. REST APIs
+
+Implement:
+
+### Create expense
+
+```http
+POST /api/expenses
+```
+
+Request:
+
+```json
+{
+  "amount": 850.50,
+  "currency": "INR",
+  "category": "FOOD",
+  "description": "Dinner",
+  "paymentMethod": "UPI"
+}
+```
+
+---
+
+### Get expenses
+
+```http
+GET /api/expenses
+```
+
+Support:
+
+```text
+page
+size
+sort
+category
+paymentMethod
+status
+startDate
+endDate
+minAmount
+maxAmount
+```
+
+Example:
+
+```http
+GET /api/expenses?page=0&size=10&category=FOOD&sort=createdAt,desc
+```
+
+---
+
+### Get expense
+
+```http
+GET /api/expenses/{id}
+```
+
+---
+
+### Update expense
+
+```http
+PUT /api/expenses/{id}
+```
+
+---
+
+### Delete expense
+
+```http
+DELETE /api/expenses/{id}
+```
+
+---
+
+# 6. Financial Summary API
+
+Create:
+
+```http
+GET /api/expenses/summary
+```
+
+Support date filtering.
+
+Example:
+
+```http
+GET /api/expenses/summary?startDate=2026-09-01&endDate=2026-09-30
+```
+
+Response:
+
+```json
+{
+  "totalExpenses": 25450.50,
+  "transactionCount": 42,
+  "averageExpense": 605.96,
+  "highestExpense": 4500.00,
+  "categoryBreakdown": {
+    "FOOD": 6500.00,
+    "TRANSPORT": 3200.00,
+    "SHOPPING": 8700.00,
+    "BILLS": 7050.50
+  }
+}
+```
+
+Implement this using PostgreSQL/JPA queries rather than loading every transaction into Java memory.
+
+---
+
+# 7. Ledger Service
+
+Create a separate Ledger Service.
+
+The Ledger represents the financial record associated with an expense.
+
+Ledger entry:
+
+```text
+id
+expenseId
+userId
+amount
+currency
+transactionType
+status
+eventId
+createdAt
+```
+
+Transaction types:
+
+```text
+DEBIT
+CREDIT
+```
+
+The ledger should be treated as an **append-oriented financial record**.
+
+Avoid allowing arbitrary modification of historical ledger entries.
+
+---
+
+# 8. Kafka Event-Driven Architecture
+
+Use Kafka for communication between services.
+
+The Expense Service should publish events rather than directly calling every downstream service.
+
+Example:
+
+```text
+Expense Created
+      │
+      ▼
+Kafka
+      │
+      ├──► Ledger Service
+      │
+      ├──► Notification Service
+      │
+      └──► Reporting Service
+```
+
+Create an event:
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "EXPENSE_CREATED",
+  "occurredAt": "2026-10-02T18:00:00Z",
+  "expenseId": "uuid",
+  "userId": "uuid",
+  "amount": 850.50,
+  "currency": "INR"
+}
+```
+
+---
+
+# 9. Kafka Topics
+
+Create appropriate topics such as:
+
+```text
+expense.created
+expense.updated
+expense.deleted
+ledger.entry.created
+```
+
+Use meaningful partition keys.
+
+For expense events, use:
+
+```text
+userId
+```
+
+or another justified key.
+
+Explain why you chose the partition key.
+
+---
+
+# 10. Kafka Consumer
+
+Ledger Service should consume:
+
+```text
+expense.created
+```
+
+and create the corresponding ledger entry.
+
+Reporting Service should consume relevant expense events and maintain reporting/read-model data.
+
+Notification Service can consume expense events and simulate sending notifications.
+
+Do NOT actually integrate with an external email provider.
+
+A simple log such as:
+
+```text
+Notification sent for expense <id>
+```
+
+is enough.
+
+---
+
+# 11. Idempotency
+
+This is mandatory.
+
+Kafka consumers must be **idempotent**.
+
+For example, if:
+
+```text
+expense.created
+```
+
+is delivered twice, the Ledger Service must NOT create two ledger entries.
+
+Create an event processing mechanism such as:
+
+```text
+processed_events
+```
+
+with:
+
+```text
+event_id
+consumer_name
+processed_at
+```
+
+Before processing an event:
+
+```text
+if event already processed:
+    ignore event
+else:
+    process event
+    mark event processed
+```
+
+Use a unique constraint on the appropriate columns.
+
+Explain why Kafka provides at-least-once delivery and why application-level idempotency is therefore required.
+
+---
+
+# 12. Retry Mechanism
+
+Implement retries for Kafka consumers.
+
+Example:
+
+```text
+Attempt 1
+   ↓
+failure
+   ↓
+Attempt 2
+   ↓
+failure
+   ↓
+Attempt 3
+   ↓
+failure
+   ↓
+DLQ
+```
+
+Use Spring Kafka's retry/error handling mechanisms where appropriate.
+
+Configure:
+
+```text
+maximum attempts = 3
+```
+
+Use reasonable backoff.
+
+For example:
+
+```text
+1 second
+2 seconds
+4 seconds
+```
+
+Do not implement a custom retry framework unless necessary.
+
+---
+
+# 13. Dead Letter Queue
+
+If a message cannot be processed after retries, publish it to a DLQ.
+
+Example:
+
+```text
+expense.created
+       │
+       ▼
+Consumer
+       │
+       ├── success ──► Ledger
+       │
+       └── failure
+             │
+             ▼
+           Retry
+             │
+             ▼
+          3 attempts
+             │
+             ▼
+        expense.created.DLT
+```
+
+Configure and explain:
+
+* Why the message failed
+* Retry count
+* Original topic
+* Partition
+* Offset
+* Exception information
+
+Make DLQ handling observable through logs.
+
+---
+
+# 14. Transaction + Kafka Considerations
+
+Do not blindly assume that:
+
+```text
+DB transaction + Kafka publish
+```
+
+is automatically atomic.
+
+Explain the failure scenario:
+
+```text
+DB commit succeeds
+Kafka publish fails
+```
+
+and:
+
+```text
+Kafka publish succeeds
+DB commit fails
+```
+
+For the initial implementation, use a practical approach such as a **Transactional Outbox Pattern**.
+
+---
+
+# 15. Transactional Outbox
+
+Implement an Outbox table in the Expense Service:
+
+```text
+outbox_event
+----------------
+id
+aggregate_id
+event_type
+payload
+created_at
+published
+```
+
+When creating an expense:
+
+```text
+BEGIN TRANSACTION
+
+INSERT expense
+
+INSERT outbox_event
+
+COMMIT
+```
+
+Then a publisher component reads unpublished outbox events and publishes them to Kafka.
+
+This prevents the major problem where the expense is successfully saved but the Kafka event is lost.
+
+Explain the trade-offs and limitations.
+
+---
+
+# 16. Reporting Service
+
+Create a simple Reporting Service.
+
+Instead of querying the Expense Service every time, maintain a read model from Kafka events.
+
+For example:
+
+```text
+expense.created
+      ↓
+Reporting Service
+      ↓
+reporting DB
+```
+
+Store aggregated data such as:
+
+```text
+userId
+category
+totalAmount
+transactionCount
+lastUpdated
+```
+
+Provide:
+
+```http
+GET /api/reports/summary
+```
+
+This demonstrates the concept of:
+
+```text
+CQRS / Read Model
+```
+
+Do not implement a full CQRS framework.
+
+Keep it simple.
+
+---
+
+# 17. Database-per-Service
+
+Each microservice should own its own database/schema.
+
+For example:
+
+```text
+auth_db
+expense_db
+ledger_db
+reporting_db
+```
+
+Do NOT allow services to directly access another service's database.
+
+Communication should happen through:
+
+```text
+REST
+Kafka
+```
+
+where appropriate.
+
+---
+
+# 18. Security
+
+Implement JWT-based authentication.
+
+Protected APIs should require:
+
+```http
+Authorization: Bearer <JWT>
+```
+
+Users must only be able to access their own expenses.
+
+For example:
+
+```text
+GET /expenses/{id}
+```
+
+must verify that the expense belongs to the authenticated user.
+
+Do not trust a userId sent by the client.
+
+Extract the user identity from the authenticated JWT.
+
+---
+
+# 19. Error Handling
+
+Implement consistent error responses.
+
+Example:
+
+```json
+{
+  "timestamp": "2026-10-02T18:00:00Z",
+  "status": 404,
+  "error": "EXPENSE_NOT_FOUND",
+  "message": "Expense not found",
+  "path": "/api/expenses/123"
+}
+```
+
+Use:
+
+```text
+@RestControllerAdvice
+```
+
+Handle:
+
+* Validation errors
+* Authentication errors
+* Authorization errors
+* Resource not found
+* Invalid request
+* Database errors
+* Kafka errors
+
+Do not expose stack traces to API clients.
+
+---
+
+# 20. Layered Architecture
+
+Within each service use:
+
+```text
+Controller
+    ↓
+Service
+    ↓
+Repository
+    ↓
+Database
+```
+
+For example:
+
+```text
+ExpenseController
+        ↓
+ExpenseService
+        ↓
+ExpenseRepository
+        ↓
+PostgreSQL
+```
+
+Use DTOs rather than exposing JPA entities directly.
+
+Suggested structure:
+
+```text
+controller
+service
+repository
+entity
+dto
+mapper
+exception
+config
+security
+messaging
+```
+
+Keep business logic out of controllers.
+
+---
+
+# 21. Testing
+
+Testing is a major requirement.
+
+## Unit Tests
+
+Use:
+
+```text
+JUnit 5
+Mockito
+```
+
+Test:
+
+* ExpenseService
+* AuthService
+* LedgerService
+* Event processing
+* Idempotency logic
+* Validation/business rules
+
+Example:
+
+```text
+createExpense_shouldCreateExpense()
+getExpense_shouldRejectUnauthorizedUser()
+processDuplicateEvent_shouldNotCreateDuplicateLedgerEntry()
+```
+
+Aim for meaningful coverage rather than artificially chasing 100%.
+
+---
+
+# 22. Controller Integration Tests
+
+Use:
+
+```text
+@SpringBootTest
+MockMvc
+```
+
+Test:
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+POST /api/expenses
+GET /api/expenses
+GET /api/expenses/{id}
+PUT /api/expenses/{id}
+DELETE /api/expenses/{id}
+GET /api/expenses/summary
+```
+
+Test both:
+
+```text
+successful requests
+failure scenarios
+```
+
+---
+
+# 23. Integration Testing
+
+Use **Testcontainers** for:
+
+```text
+PostgreSQL
+Kafka
+```
+
+Do not rely exclusively on mocks.
+
+Create at least one end-to-end integration test:
+
+```text
+Create Expense
+      ↓
+PostgreSQL
+      ↓
+Outbox Event
+      ↓
+Kafka
+      ↓
+Ledger Consumer
+      ↓
+Ledger PostgreSQL
+```
+
+Verify that the ledger entry is eventually created.
+
+Also test duplicate Kafka event processing.
+
+---
+
+# 24. Docker
+
+Dockerize every service.
+
+Create:
+
+```text
+Dockerfile
+```
+
+for each Spring Boot service.
+
+Use multi-stage Docker builds where practical.
+
+Example architecture:
+
+```text
+docker-compose.yml
+
+services:
+
+  api-gateway
+  auth-service
+  expense-service
+  ledger-service
+  reporting-service
+  notification-service
+
+  postgres-auth
+  postgres-expense
+  postgres-ledger
+  postgres-reporting
+
+  kafka
+  zookeeper
+```
+
+If using a modern Kafka setup with KRaft instead of ZooKeeper, prefer KRaft.
+
+Expose only necessary ports.
+
+Services should communicate using Docker service names rather than:
+
+```text
+localhost
+```
+
+inside containers.
+
+---
+
+# 25. Configuration
+
+Do not hardcode:
+
+```text
+database passwords
+JWT secret
+Kafka addresses
+```
+
+Use environment variables.
+
+Example:
+
+```text
+DB_URL
+DB_USERNAME
+DB_PASSWORD
+JWT_SECRET
+KAFKA_BOOTSTRAP_SERVERS
+```
+
+Provide:
+
+```text
+.env.example
+```
+
+but do not commit real secrets.
+
+---
+
+# 26. Database Migrations
+
+Use:
+
+```text
+Flyway
+```
+
+for database schema migrations.
+
+Each service should maintain its own migrations.
+
+Example:
+
+```text
+db/migration
+    V1__create_users.sql
+    V2__add_indexes.sql
+```
+
+Do not rely on:
+
+```text
+spring.jpa.hibernate.ddl-auto=create
+```
+
+for production-style schema management.
+
+Use:
+
+```text
+validate
+```
+
+or an appropriate setting with Flyway managing schema creation.
+
+---
+
+# 27. Observability
+
+Add basic production-style observability.
+
+Implement:
+
+* Structured logging where practical
+* Request logging
+* Kafka consumer logs
+* Retry logs
+* DLQ logs
+* Correlation ID
+
+Propagate a correlation ID through relevant requests/events.
+
+Example:
+
+```text
+X-Correlation-ID: abc-123
+```
+
+This should make debugging a distributed transaction easier.
+
+---
+
+# 28. API Documentation
+
+Use:
+
+```text
+Springdoc OpenAPI / Swagger
+```
+
+Document the REST APIs.
+
+Include:
+
+* Request bodies
+* Response bodies
+* Authentication
+* HTTP status codes
+* Error responses
+
+---
+
+# 29. Important Business Flow
+
+The main demonstration flow should be:
+
+```text
+Client
+  │
+  ▼
+API Gateway
+  │
+  ▼
+Expense Service
+  │
+  ├── PostgreSQL
+  │
+  └── Outbox
+        │
+        ▼
+      Kafka
+        │
+        ├──────────────► Ledger Service
+        │                    │
+        │                    ▼
+        │                Ledger DB
+        │
+        ├──────────────► Reporting Service
+        │                    │
+        │                    ▼
+        │                Reporting DB
+        │
+        └──────────────► Notification Service
+```
+
+If the Ledger consumer fails:
+
+```text
+Kafka
+  ↓
+Ledger Consumer
+  ↓
+Failure
+  ↓
+Retry
+  ↓
+Retry
+  ↓
+Retry
+  ↓
+DLQ
+```
+
+If the same event is received twice:
+
+```text
+Event #123
+   ↓
+Processed
+   ↓
+Event #123 again
+   ↓
+Detected as duplicate
+   ↓
+Ignored
+```
+
+---
+
+# 30. Project Structure
+
+Use a multi-module or multi-repository structure.
+
+For this portfolio project, prefer a **single Git repository with separate service directories**:
+
+```text
+expense-management-platform/
+│
+├── api-gateway/
+│
+├── auth-service/
+│
+├── expense-service/
+│
+├── ledger-service/
+│
+├── reporting-service/
+│
+├── notification-service/
+│
+├── docker-compose.yml
+│
+├── .env.example
+│
+├── README.md
+│
+└── docs/
+    ├── architecture.md
+    ├── kafka.md
+    ├── idempotency.md
+    ├── retry-dlq.md
+    └── database-design.md
+```
+
+---
+
+# 31. README Requirements
+
+Create a professional README.
+
+Include:
+
+### Overview
+
+What problem the system solves.
+
+### Architecture
+
+Include a Mermaid architecture diagram.
+
+### Services
+
+Explain every service.
+
+### Database Design
+
+Explain each database.
+
+### Kafka
+
+Explain:
+
+* Topics
+* Producers
+* Consumers
+* Consumer groups
+* Partitioning
+* Event structure
+
+### Reliability
+
+Explain:
+
+* Idempotency
+* Retries
+* DLQ
+* Transactional Outbox
+
+### Security
+
+Explain:
+
+* JWT
+* BCrypt
+* Authorization
+
+### Testing
+
+Explain:
+
+* Unit tests
+* Integration tests
+* Testcontainers
+
+### Running Locally
+
+Provide:
+
+```bash
+docker compose up --build
+```
+
+and explain how to access the APIs.
+
+### API Examples
+
+Provide curl examples.
+
+---
+
+# 32. Development Approach
+
+Do NOT generate the entire project in one huge response.
+
+Build it incrementally.
+
+Follow this exact order:
+
+## Phase 1 — Foundation
+
+Create:
+
+* Repository structure
+* Maven configuration
+* Auth Service
+* PostgreSQL
+* JWT authentication
+* Basic API Gateway
+
+Verify authentication works before continuing.
+
+---
+
+## Phase 2 — Expense Service
+
+Implement:
+
+* Expense entity
+* DTOs
+* Repository
+* Service
+* Controller
+* CRUD
+* Validation
+* Pagination
+* Filtering
+* Summary APIs
+
+Write unit tests.
+
+---
+
+## Phase 3 — Ledger Service
+
+Implement:
+
+* Ledger entity
+* Database
+* Ledger APIs if needed
+* Expense event model
+
+---
+
+## Phase 4 — Kafka
+
+Implement:
+
+* Kafka configuration
+* Expense events
+* Producers
+* Consumers
+* Consumer groups
+
+Demonstrate:
+
+```text
+Expense Created
+      ↓
+Kafka
+      ↓
+Ledger
+```
+
+---
+
+## Phase 5 — Reliability
+
+Implement:
+
+1. Idempotency
+2. Transactional Outbox
+3. Retry
+4. Backoff
+5. DLQ
+
+Add tests for failure scenarios.
+
+---
+
+## Phase 6 — Reporting
+
+Implement:
+
+```text
+Kafka events
+     ↓
+Reporting Service
+     ↓
+Read model
+     ↓
+Summary API
+```
+
+---
+
+## Phase 7 — Testing
+
+Add:
+
+* JUnit
+* Mockito
+* MockMvc
+* Testcontainers
+* Kafka integration tests
+* End-to-end test
+
+---
+
+## Phase 8 — Docker
+
+Dockerize everything.
+
+Create:
+
+```text
+docker-compose.yml
+```
+
+Verify the entire system starts using:
+
+```bash
+docker compose up --build
+```
+
+---
+
+## Phase 9 — Documentation
+
+Create:
+
+* Architecture diagram
+* Sequence diagrams
+* API documentation
+* Kafka documentation
+* Reliability documentation
+* README
+
+---
+
+# 33. Coding Rules
+
+Follow these rules throughout the project:
+
+1. Use Java 21 features where they improve readability.
+2. Do not use Lombok.
+3. Prefer constructor dependency injection.
+4. Do not expose JPA entities directly from controllers.
+5. Use DTOs.
+6. Validate incoming requests.
+7. Use meaningful exception classes.
+8. Use `@RestControllerAdvice`.
+9. Do not put business logic in controllers.
+10. Do not allow services to access another service's database.
+11. Do not hardcode secrets.
+12. Do not use `ddl-auto=create` for the final project.
+13. Use Flyway.
+14. Use proper database indexes.
+15. Use pagination rather than returning huge datasets.
+16. Write tests alongside implementation.
+17. Keep Kafka event schemas explicit.
+18. Make consumers idempotent.
+19. Do not silently swallow exceptions.
+20. Explain important architectural decisions.
+
+---
+
+# 34. What I Expect From You
+
+Act as both:
+
+**Senior Developer + Mentor**
+
+Do not just dump code.
+
+For every major implementation:
+
+1. Explain what we are building.
+2. Explain why the design is being used.
+3. Show the folder structure.
+4. Show the code.
+5. Explain important parts of the code.
+6. Explain how to run it.
+7. Give commands to test it.
+8. Explain common errors.
+9. Give me a small verification checklist before moving to the next phase.
+
+When a concept is important, explain it using the actual project.
+
+For example, when implementing idempotency, explain:
+
+```text
+Why Kafka can deliver duplicate messages
+↓
+Why duplicate processing is dangerous for financial data
+↓
+How event IDs solve the problem
+↓
+How the database unique constraint provides protection
+↓
+How the implementation works
+```
+
+---
+
+# 35. Portfolio Quality
+
+The final project should look like a realistic backend engineering project rather than a tutorial CRUD application.
+
+The strongest concepts I want the project to demonstrate are:
+
+```text
+Spring Boot
+      +
+Microservices
+      +
+JWT Security
+      +
+PostgreSQL
+      +
+Kafka
+      +
+Event-Driven Architecture
+      +
+Transactional Outbox
+      +
+Idempotency
+      +
+Retry / DLQ
+      +
+Testing
+      +
+Docker
+```
+
+Keep the business domain simple enough that I can explain the entire system confidently in an interview.
+
+Do not add unnecessary technologies such as:
+
+* Kubernetes
+* Redis
+* Elasticsearch
+* Cassandra
+* Service Mesh
+* Eureka
+* Config Server
+* Prometheus/Grafana
+
+unless there is a strong architectural reason.
+
+The goal is **depth, not technology collecting**.
+
+---
+
+# START
+
+Start with **Phase 1 — Foundation**.
+
+Before writing code, give me:
+
+1. Final architecture
+2. Service responsibilities
+3. Database-per-service design
+4. Request/event flow
+5. Repository structure
+6. Technology/version choices
+7. Implementation roadmap
+
+Then begin implementing Phase 1 step by step.
+
+Do not proceed to the next phase until the current phase is working.
+
+### One change I'd strongly recommend
+
+For a resume project, this is substantially better than simply adding "microservices + Kafka" to the existing CRUD app. The **Transactional Outbox → Kafka → Idempotent Consumer → Retry → DLT** chain gives you an actual distributed-systems story to explain in interviews.
+
+Your eventual resume bullet could become something like:
+
+> **Expense Management & Payment Ledger Platform | Java, Spring Boot, Kafka, PostgreSQL, Docker** — Built a microservices-based expense and ledger platform with JWT authentication, event-driven communication using Kafka, transactional outbox, idempotent consumers, retry/DLT handling, financial reporting APIs, and JUnit/Mockito/Testcontainers integration testing.
+
+That is much stronger than a generic "built REST APIs with Spring Boot."

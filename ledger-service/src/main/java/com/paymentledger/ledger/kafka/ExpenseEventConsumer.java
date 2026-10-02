@@ -68,6 +68,8 @@ public class ExpenseEventConsumer {
             
             log.info("Processed expense event {} into ledger entry {}", expenseId, savedEntry.getId());
             
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Concurrent duplicate event detected via unique constraint on processed_events. Safely skipped.");
         } catch (Exception e) {
             log.error("Failed to process expense event", e);
             throw new RuntimeException("Error processing message", e);

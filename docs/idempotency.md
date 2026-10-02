@@ -2,7 +2,7 @@
 
 ## Why At-Least-Once Delivery Requires Idempotency
 
-Apache Kafka provides "at-least-once" delivery semantics by default. This means a consumer might receive the same message more than once due to network partitions, consumer rebalances, or producer retries. To ensure system accuracy (e.g., preventing double-counting in the ledger), consumers must be idempotent—processing the same message multiple times must have the same effect as processing it exactly once.
+Apache Kafka provides "at-least-once" delivery semantics by default. This means a consumer might receive the same message more than once due to network partitions, consumer rebalances, or producer retries. To ensure system accuracy (e.g., preventing duplicate journal entries in the ledger or skewed aggregates in reports), consumers implement **idempotent event processing using persistent event deduplication to prevent duplicate processing effects**.
 
 ## The `processed_events` Table Design
 

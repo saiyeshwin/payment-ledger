@@ -53,7 +53,7 @@ flowchart LR
 
 1. **Database-per-Service** - No shared schemas; each service manages its own PostgreSQL database, enabling loose coupling.
 2. **Transactional Outbox Pattern** - Ensures atomic creation of an expense and its related event in the outbox table. A relay process asynchronously publishes outbox entries to Kafka.
-3. **Idempotent Consumers** - Kafka consumers use a `processed_events` table with a composite primary key (`event_id`, `consumer_group`) to safely ignore duplicate message deliveries.
+3. **Idempotent Consumers** — Kafka consumers use a `processed_events` table with a composite primary key (`event_id`, `consumer_group`) to prevent duplicate processing effects.
 4. **Retry Backoff + Dead Letter Topic** - Configured via Spring Kafka. Uses an `ExponentialBackOff` policy, routing permanently failed messages to `.DLT` topics.
 5. **CQRS Read Model** - The Reporting Service materializes an aggregated read model specifically optimized for fast queries, consuming events published by the Expense Service.
 
@@ -154,7 +154,7 @@ mvn test -Dgroups=integration
 4. **Local Transaction**: Expense Service saves the expense to `expense_db` and simultaneously writes an `ExpenseCreatedEvent` to the `outbox` table in a single atomic transaction.
 5. **Outbox Relay**: A background scheduler process polls the `outbox` table and publishes the event to the `expense.created` Kafka topic.
 6. **Async Consumption**: Ledger, Reporting, and Notification services consume the event from Kafka independently.
-7. **Idempotent Processing**: Each consumer uses its local `processed_events` table for idempotent event processing using persistent event deduplication to prevent duplicate processing effects.
+7. **Idempotent processing**: Each consumer uses a local `processed_events` table to safely ignore duplicate event deliveries.
 8. **Materialized Views**: Reporting Service updates its CQRS read model, Ledger Service appends double-entry audit records.
 
 ## Concurrency & Reliability Verification
